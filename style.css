@@ -630,7 +630,9 @@ h3 {
 .bolinha-legenda.pendente {
   background-color: #dc3545;
 }
-
+.bolinha-legenda.em-andamento {
+  background-color: #d4dc35;
+}
 .bolinha-legenda.resolvida {
   background-color: #198754;
 }
