@@ -636,3 +636,35 @@ h3 {
 .bolinha-legenda.resolvida {
   background-color: #198754;
 }
+```css
+/* Acesso administrativo no menu */
+.nav-admin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid #001B3A;
+  border-radius: 8px;
+  color: #001B3A;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.nav-admin:hover {
+  background-color: #001B3A;
+  color: #ffffff;
+}
+
+/* Ajuste para telas menores */
+@media (max-width: 768px) {
+  .site-header nav {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .nav-admin {
+    padding: 8px 12px;
+  }
+}
