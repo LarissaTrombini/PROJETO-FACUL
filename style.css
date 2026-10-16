@@ -636,7 +636,6 @@ h3 {
 .bolinha-legenda.resolvida {
   background-color: #198754;
 }
-```css
 /* Acesso administrativo no menu */
 .nav-admin {
   display: inline-flex;
@@ -667,4 +666,40 @@ h3 {
   .nav-admin {
     padding: 8px 12px;
   }
+}
+
+/* Seção de acompanhamento das ocorrências */
+.ocorrencias-section {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.ocorrencias-section .section-heading {
+  margin-bottom: 20px;
+}
+
+.ocorrencias-section .lista-status {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.ocorrencias-section #lista-ocorrencias {
+  display: grid;
+  gap: 14px;
+}
+
+/* Exibe somente as três primeiras ocorrências inicialmente */
+.ocorrencias-section #lista-ocorrencias.recolhida > :nth-child(n + 4) {
+  display: none;
+}
+
+/* Botão para expandir ou recolher a lista */
+.btn-ver-ocorrencias {
+  margin: 20px auto 0;
+  display: flex;
+}
+
+.btn-ver-ocorrencias[hidden] {
+  display: none;
 }
