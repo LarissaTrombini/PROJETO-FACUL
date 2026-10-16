@@ -637,24 +637,23 @@ h3 {
   background-color: #198754;
 }
 /* Acesso administrativo no menu */
-.nav-admin {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 16px;
-  border: 1px solid #001B3A;
+
+/* Mesmo estilo dos botões do menu */
+nav .nav-admin {
+  background: var(--cor-primaria, #001B3A);
+  color: #ffffff;
+  padding: 12px 18px;
   border-radius: 8px;
-  color: #001B3A;
   text-decoration: none;
   font-weight: 600;
-  font-size: 14px;
-  transition: background-color 0.2s, color 0.2s;
+  transition: background 0.2s ease;
 }
 
-.nav-admin:hover {
-  background-color: #001B3A;
+nav .nav-admin:hover {
+  background: var(--cor-primaria-hover, #12385a);
   color: #ffffff;
 }
+
 
 /* Ajuste para telas menores */
 @media (max-width: 768px) {
