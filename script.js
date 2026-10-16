@@ -32,15 +32,23 @@ document.addEventListener("DOMContentLoaded", function () {
   const form = $("report-form");
   const formMessage = $("form-message");
 
+  const listaOcorrencias = $("lista-ocorrencias");
+  const mensagemLista = $("lista-status");
+  const botaoVerOcorrencias = $("btn-ver-ocorrencias");
+
   // 3. LISTAR OCORRÊNCIAS NO SITE
   async function carregarOcorrencias() {
-    const lista = $("lista-ocorrencias");
-    const mensagem = $("lista-status");
+    if (!listaOcorrencias || !mensagemLista) return;
 
-    if (!lista || !mensagem) return;
+    mensagemLista.textContent = "Carregando ocorrências...";
+    listaOcorrencias.replaceChildren();
+    listaOcorrencias.classList.add("recolhida");
 
-    mensagem.textContent = "Carregando ocorrências...";
-    lista.replaceChildren();
+    if (botaoVerOcorrencias) {
+      botaoVerOcorrencias.hidden = true;
+      botaoVerOcorrencias.textContent = "Ver todas as ocorrências";
+      botaoVerOcorrencias.setAttribute("aria-expanded", "false");
+    }
 
     const { data, error } = await supabaseClient
       .from("ocorrencias")
@@ -49,16 +57,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (error) {
       console.error("Erro ao carregar ocorrências:", error);
-      mensagem.textContent = "Não foi possível carregar as ocorrências.";
+      mensagemLista.textContent =
+        "Não foi possível carregar as ocorrências. Tente novamente mais tarde.";
       return;
     }
 
     if (!data || data.length === 0) {
-      mensagem.textContent = "Ainda não existem ocorrências cadastradas.";
+      mensagemLista.textContent =
+        "Ainda não existem ocorrências cadastradas.";
       return;
     }
 
-    mensagem.textContent = data.length + " ocorrência(s) registrada(s).";
+    mensagemLista.textContent =
+      `${data.length} ocorrência(s) registrada(s).`;
 
     data.forEach(function (ocorrencia) {
       const card = document.createElement("article");
@@ -68,45 +79,107 @@ document.addEventListener("DOMContentLoaded", function () {
       titulo.textContent = ocorrencia.categoria || "Sem categoria";
 
       const descricao = document.createElement("p");
-      descricao.textContent = ocorrencia.descricao || "Sem descrição.";
+      descricao.textContent =
+        ocorrencia.descricao || "Sem descrição.";
 
       const local = document.createElement("p");
       local.textContent =
         "Local: " + (ocorrencia.localizacao || "Não informado");
 
       const statusCard = document.createElement("p");
-      statusCard.textContent =
-        "Status: " + (ocorrencia.status || "Aberto");
+      const status = ocorrencia.status || "Aberto";
+
+      statusCard.textContent = "Status: " + status;
+      statusCard.className = "status-ocorrencia";
 
       const dataRegistro = document.createElement("small");
+
       if (ocorrencia.criado_em) {
+        const data = new Date(ocorrencia.criado_em);
+
         dataRegistro.textContent =
           "Registrada em " +
-          new Date(ocorrencia.criado_em).toLocaleString("pt-BR");
+          (Number.isNaN(data.getTime())
+            ? "data não disponível"
+            : data.toLocaleString("pt-BR"));
       }
 
-      card.append(titulo, descricao, local, statusCard, dataRegistro);
-      lista.appendChild(card);
+      card.append(
+        titulo,
+        descricao,
+        local,
+        statusCard,
+        dataRegistro
+      );
+
+      listaOcorrencias.appendChild(card);
+    });
+
+    // Mostrar somente as três primeiras ocorrências
+    listaOcorrencias.classList.add("recolhida");
+
+    if (botaoVerOcorrencias) {
+      botaoVerOcorrencias.hidden = data.length <= 3;
+    }
+  }
+
+  // 4. BOTÃO PARA EXPANDIR OU RECOLHER A LISTA
+  if (botaoVerOcorrencias) {
+    botaoVerOcorrencias.addEventListener("click", function () {
+      if (!listaOcorrencias) return;
+
+      const expandida =
+        botaoVerOcorrencias.getAttribute("aria-expanded") === "true";
+
+      if (expandida) {
+        listaOcorrencias.classList.add("recolhida");
+
+        botaoVerOcorrencias.textContent =
+          "Ver todas as ocorrências";
+
+        botaoVerOcorrencias.setAttribute("aria-expanded", "false");
+
+        $("ocorrencias")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      } else {
+        listaOcorrencias.classList.remove("recolhida");
+
+        botaoVerOcorrencias.textContent = "Mostrar menos";
+
+        botaoVerOcorrencias.setAttribute("aria-expanded", "true");
+      }
     });
   }
 
-  // 4. VERIFICAR MAPA E FORMULÁRIO
+  // Carregar a lista independentemente do funcionamento do mapa
+  carregarOcorrencias();
+
+  // 5. VERIFICAR MAPA E FORMULÁRIO
   if (!mapElement || typeof L === "undefined") {
     if (statusElemento) {
       statusElemento.textContent =
-        "Não foi possível carregar o mapa. Verifique sua internet.";
+        "Não foi possível carregar o mapa. Verifique sua conexão.";
     }
-    carregarOcorrencias();
     return;
   }
 
   if (
-    !form || !categorySelect || !descriptionInput || !photoInput ||
-    !confirmButton || !myLocationButton || !formMessage ||
-    !latitudeInput || !longitudeInput || !locationInput
+    !form ||
+    !categorySelect ||
+    !descriptionInput ||
+    !photoInput ||
+    !confirmButton ||
+    !myLocationButton ||
+    !formMessage ||
+    !latitudeInput ||
+    !longitudeInput ||
+    !locationInput
   ) {
-    console.error("Um ou mais elementos do formulário não foram encontrados.");
-    carregarOcorrencias();
+    console.error(
+      "Um ou mais elementos do formulário não foram encontrados."
+    );
     return;
   }
 
@@ -114,12 +187,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (!submitButton) {
     console.error("Botão de envio não encontrado.");
-    carregarOcorrencias();
     return;
   }
 
-  // 5. INICIALIZAR MAPA
+  // 6. INICIALIZAR MAPA
   const localPadrao = [-27.1004, -52.6152];
+
   const map = L.map("map").setView(localPadrao, 14);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -127,7 +200,7 @@ document.addEventListener("DOMContentLoaded", function () {
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  // 6. MARCADORES DAS OCORRÊNCIAS
+  // 7. MARCADORES DAS OCORRÊNCIAS
   const camadaOcorrencias = L.layerGroup().addTo(map);
 
   async function carregarMarcadoresOcorrencias() {
@@ -160,8 +233,10 @@ document.addEventListener("DOMContentLoaded", function () {
         ocorrencia.longitude == null ||
         !Number.isFinite(lat) ||
         !Number.isFinite(lng) ||
-        lat < -90 || lat > 90 ||
-        lng < -180 || lng > 180
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
       ) {
         return;
       }
@@ -172,9 +247,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
       let cor = "#dc3545";
 
-      if (status === "em andamento" || status === "em_andamento") {
+      if (
+        status === "em andamento" ||
+        status === "em_andamento"
+      ) {
         cor = "#ffc107";
-      } else if (status === "resolvido" || status === "resolvida") {
+      } else if (
+        status === "resolvido" ||
+        status === "resolvida"
+      ) {
         cor = "#198754";
       }
 
@@ -206,7 +287,8 @@ document.addEventListener("DOMContentLoaded", function () {
       titulo.textContent = ocorrencia.categoria || "Ocorrência";
 
       const descricao = document.createElement("p");
-      descricao.textContent = ocorrencia.descricao || "Sem descrição.";
+      descricao.textContent =
+        ocorrencia.descricao || "Sem descrição.";
 
       const local = document.createElement("p");
       local.textContent =
@@ -217,26 +299,32 @@ document.addEventListener("DOMContentLoaded", function () {
         "Status: " + (ocorrencia.status || "Aberto");
 
       popup.append(titulo, descricao, local, statusPopup);
-      marcadorOcorrencia.bindPopup(popup).addTo(camadaOcorrencias);
+
+      marcadorOcorrencia
+        .bindPopup(popup)
+        .addTo(camadaOcorrencias);
 
       totalMarcadores++;
     });
 
-    console.log("Marcadores de ocorrências carregados:", totalMarcadores);
+    console.log(
+      "Marcadores de ocorrências carregados:",
+      totalMarcadores
+    );
   }
 
-  // Carregar dados uma vez
-  carregarOcorrencias();
   carregarMarcadoresOcorrencias();
 
-  // 7. VARIÁVEIS DO MAPA E CADASTRO
+  // 8. VARIÁVEIS DO MAPA E CADASTRO
   let marcador = null;
   let marcadorUsuario = null;
   let pontoEscolhido = null;
   let localConfirmado = false;
 
   function atualizarStatus(mensagem) {
-    if (statusElemento) statusElemento.textContent = mensagem;
+    if (statusElemento) {
+      statusElemento.textContent = mensagem;
+    }
   }
 
   function bloquearFormulario(bloquear) {
@@ -249,7 +337,7 @@ document.addEventListener("DOMContentLoaded", function () {
   bloquearFormulario(true);
   confirmButton.disabled = true;
 
-  // 8. MARCAR LOCAL NO MAPA
+  // 9. MARCAR LOCAL NO MAPA
   function mostrarPonto(lat, lng) {
     pontoEscolhido = { lat, lng };
     localConfirmado = false;
@@ -263,18 +351,22 @@ document.addEventListener("DOMContentLoaded", function () {
       marcador = L.marker([lat, lng]).addTo(map);
     }
 
-    marcador.bindPopup("Ponto escolhido para a ocorrência").openPopup();
+    marcador
+      .bindPopup("Ponto escolhido para a ocorrência")
+      .openPopup();
 
-    coordinates.textContent =
-      "Latitude: " + lat.toFixed(6) +
-      " | Longitude: " + lng.toFixed(6);
+    if (coordinates) {
+      coordinates.textContent =
+        "Latitude: " + lat.toFixed(6) +
+        " | Longitude: " + lng.toFixed(6);
+    }
 
     atualizarStatus(
       "Ponto marcado! Clique em Confirmar local se estiver correto."
     );
   }
 
-  // 9. LOCALIZAÇÃO DO USUÁRIO
+  // 10. LOCALIZAÇÃO DO USUÁRIO
   function localizarUsuario() {
     if (!navigator.geolocation) {
       atualizarStatus(
@@ -338,16 +430,19 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   localizarUsuario();
+
   myLocationButton.addEventListener("click", localizarUsuario);
 
   map.on("click", function (evento) {
     mostrarPonto(evento.latlng.lat, evento.latlng.lng);
   });
 
-  // 10. CONFIRMAR LOCAL
+  // 11. CONFIRMAR LOCAL
   confirmButton.addEventListener("click", function () {
     if (!pontoEscolhido) {
-      atualizarStatus("Clique no mapa para escolher um local primeiro.");
+      atualizarStatus(
+        "Clique no mapa para escolher um local primeiro."
+      );
       return;
     }
 
@@ -355,6 +450,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const lng = pontoEscolhido.lng;
 
     localConfirmado = true;
+
     latitudeInput.value = lat.toFixed(6);
     longitudeInput.value = lng.toFixed(6);
 
@@ -372,14 +468,18 @@ document.addEventListener("DOMContentLoaded", function () {
     );
 
     const registrar = $("registrar");
+
     if (registrar) {
-      registrar.scrollIntoView({ behavior: "smooth", block: "start" });
+      registrar.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
     }
 
     categorySelect.focus({ preventScroll: true });
   });
 
-  // 11. CADASTRAR OCORRÊNCIA E ENVIAR FOTO
+  // 12. CADASTRAR OCORRÊNCIA E ENVIAR FOTO
   form.addEventListener("submit", async function (evento) {
     evento.preventDefault();
 
@@ -387,10 +487,10 @@ document.addEventListener("DOMContentLoaded", function () {
       formMessage.textContent =
         "Selecione e confirme um local no mapa antes de continuar.";
 
-      const mapaSection = $("mapa-section");
-      if (mapaSection) {
-        mapaSection.scrollIntoView({ behavior: "smooth" });
-      }
+      $("mapa-section")?.scrollIntoView({
+        behavior: "smooth"
+      });
+
       return;
     }
 
@@ -401,7 +501,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const arquivoFoto = photoInput.files?.[0] || null;
 
-    // Validar formato e tamanho
+    // Validar formato e tamanho da foto
     if (arquivoFoto) {
       const tiposPermitidos = [
         "image/jpeg",
@@ -417,12 +517,14 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (arquivoFoto.size > 5 * 1024 * 1024) {
-        formMessage.textContent = "A foto deve ter no máximo 5 MB.";
+        formMessage.textContent =
+          "A foto deve ter no máximo 5 MB.";
         return;
       }
     }
 
     submitButton.disabled = true;
+
     formMessage.textContent = arquivoFoto
       ? "Enviando foto e salvando ocorrência..."
       : "Salvando ocorrência...";
@@ -433,7 +535,7 @@ document.addEventListener("DOMContentLoaded", function () {
     try {
       let fotoUrl = null;
 
-      // 1. Enviar foto ao Storage
+      // 1. Enviar foto para o Supabase Storage
       if (arquivoFoto) {
         const extensoesPermitidas = {
           "image/jpeg": "jpg",
@@ -443,8 +545,17 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         const extensao = extensoesPermitidas[arquivoFoto.type];
-        const nomeArquivo =
-          `${Date.now()}-${crypto.randomUUID()}.${extensao}`;
+
+        if (!extensao) {
+          throw new Error("Formato de imagem não permitido.");
+        }
+
+        const identificador =
+          typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        const nomeArquivo = `${Date.now()}-${identificador}.${extensao}`;
 
         caminhoFoto = `ocorrencias/${nomeArquivo}`;
 
@@ -479,7 +590,7 @@ document.addEventListener("DOMContentLoaded", function () {
         fotoUrl = dadosFoto.publicUrl;
       }
 
-      // 2. Salvar ocorrência com foto_url
+      // 2. Salvar ocorrência no banco de dados
       const ocorrencia = {
         categoria: categorySelect.value,
         localizacao: locationInput.value,
@@ -508,6 +619,7 @@ document.addEventListener("DOMContentLoaded", function () {
         " Número do registro: " + data.id;
 
       form.reset();
+
       localConfirmado = false;
       pontoEscolhido = null;
 
@@ -519,12 +631,15 @@ document.addEventListener("DOMContentLoaded", function () {
         marcador = null;
       }
 
-      if (coordinates) coordinates.textContent = "";
+      if (coordinates) {
+        coordinates.textContent = "";
+      }
 
       atualizarStatus(
         "Registro concluído! Marque um novo local para registrar outra ocorrência."
       );
 
+      // Atualizar lista e marcadores após o cadastro
       await Promise.all([
         carregarOcorrencias(),
         carregarMarcadoresOcorrencias()
@@ -537,7 +652,7 @@ document.addEventListener("DOMContentLoaded", function () {
         erro?.message ||
         "Não foi possível registrar a ocorrência. Confira as permissões do Supabase.";
 
-      // Remover foto órfã se o cadastro falhar depois do upload
+      // Remover foto caso o cadastro tenha falhado após o upload
       if (fotoEnviada && caminhoFoto) {
         const { error: erroRemocao } = await supabaseClient
           .storage
