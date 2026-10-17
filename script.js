@@ -79,24 +79,21 @@ document.addEventListener("DOMContentLoaded", function () {
       titulo.textContent = ocorrencia.categoria || "Sem categoria";
 
       const descricao = document.createElement("p");
-      descricao.textContent =
-        ocorrencia.descricao || "Sem descrição.";
+      descricao.textContent = ocorrencia.descricao || "Sem descrição.";
 
       const local = document.createElement("p");
       local.textContent =
         "Local: " + (ocorrencia.localizacao || "Não informado");
 
       const statusCard = document.createElement("p");
-      const status = ocorrencia.status || "Aberto";
-
-      statusCard.textContent = "Status: " + status;
+      statusCard.textContent =
+        "Status: " + (ocorrencia.status || "Aberto");
       statusCard.className = "status-ocorrencia";
 
       const dataRegistro = document.createElement("small");
 
       if (ocorrencia.criado_em) {
         const data = new Date(ocorrencia.criado_em);
-
         dataRegistro.textContent =
           "Registrada em " +
           (Number.isNaN(data.getTime())
@@ -133,10 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (expandida) {
         listaOcorrencias.classList.add("recolhida");
-
-        botaoVerOcorrencias.textContent =
-          "Ver todas as ocorrências";
-
+        botaoVerOcorrencias.textContent = "Ver todas as ocorrências";
         botaoVerOcorrencias.setAttribute("aria-expanded", "false");
 
         $("ocorrencias")?.scrollIntoView({
@@ -145,9 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       } else {
         listaOcorrencias.classList.remove("recolhida");
-
         botaoVerOcorrencias.textContent = "Mostrar menos";
-
         botaoVerOcorrencias.setAttribute("aria-expanded", "true");
       }
     });
@@ -192,7 +184,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // 6. INICIALIZAR MAPA
   const localPadrao = [-27.1004, -52.6152];
-
   const map = L.map("map").setView(localPadrao, 14);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -287,8 +278,7 @@ document.addEventListener("DOMContentLoaded", function () {
       titulo.textContent = ocorrencia.categoria || "Ocorrência";
 
       const descricao = document.createElement("p");
-      descricao.textContent =
-        ocorrencia.descricao || "Sem descrição.";
+      descricao.textContent = ocorrencia.descricao || "Sem descrição.";
 
       const local = document.createElement("p");
       local.textContent =
@@ -356,13 +346,16 @@ document.addEventListener("DOMContentLoaded", function () {
       .openPopup();
 
     if (coordinates) {
-      coordinates.textContent =
-        "Latitude: " + lat.toFixed(6) +
-        " | Longitude: " + lng.toFixed(6);
+      coordinates.textContent = "Buscando endereço...";
     }
 
+    // Limpar endereço anterior ao escolher outro ponto
+    locationInput.value = "";
+    latitudeInput.value = "";
+    longitudeInput.value = "";
+
     atualizarStatus(
-      "Ponto marcado! Clique em Confirmar local se estiver correto."
+      "Ponto marcado! Clique em Confirmar local para buscar o endereço."
     );
   }
 
@@ -437,8 +430,85 @@ document.addEventListener("DOMContentLoaded", function () {
     mostrarPonto(evento.latlng.lat, evento.latlng.lng);
   });
 
-  // 11. CONFIRMAR LOCAL
-  confirmButton.addEventListener("click", function () {
+  // 11. CONVERTER COORDENADAS EM ENDEREÇO
+  async function buscarEndereco(lat, lng) {
+    const parametros = new URLSearchParams({
+      format: "jsonv2",
+      lat: String(lat),
+      lon: String(lng),
+      zoom: "18",
+      addressdetails: "1",
+      "accept-language": "pt-BR"
+    });
+
+    const resposta = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?${parametros}`,
+      {
+        headers: {
+          Accept: "application/json"
+        }
+      }
+    );
+
+    if (!resposta.ok) {
+      throw new Error("Não foi possível consultar o endereço no mapa.");
+    }
+
+    const resultado = await resposta.json();
+    const endereco = resultado.address || {};
+
+    const rua =
+      endereco.road ||
+      endereco.pedestrian ||
+      endereco.residential ||
+      endereco.footway ||
+      endereco.path ||
+      endereco.street;
+
+    const numero = endereco.house_number;
+
+    const bairro =
+      endereco.suburb ||
+      endereco.neighbourhood ||
+      endereco.quarter ||
+      endereco.city_district;
+
+    const cidade =
+      endereco.city ||
+      endereco.town ||
+      endereco.village ||
+      endereco.municipality;
+
+    const estado = endereco.state;
+    const partes = [];
+
+    if (rua) {
+      partes.push(numero ? `${rua}, ${numero}` : rua);
+    }
+
+    if (bairro && !partes.includes(bairro)) {
+      partes.push(bairro);
+    }
+
+    const cidadeEstado = [cidade, estado].filter(Boolean).join(" - ");
+
+    if (cidadeEstado && !partes.includes(cidadeEstado)) {
+      partes.push(cidadeEstado);
+    }
+
+    if (partes.length > 0) {
+      return partes.join(", ");
+    }
+
+    if (resultado.display_name) {
+      return resultado.display_name;
+    }
+
+    throw new Error("O serviço de mapas não encontrou o endereço.");
+  }
+
+  // 12. CONFIRMAR LOCAL
+  confirmButton.addEventListener("click", async function () {
     if (!pontoEscolhido) {
       atualizarStatus(
         "Clique no mapa para escolher um local primeiro."
@@ -449,37 +519,82 @@ document.addEventListener("DOMContentLoaded", function () {
     const lat = pontoEscolhido.lat;
     const lng = pontoEscolhido.lng;
 
-    localConfirmado = true;
-
-    latitudeInput.value = lat.toFixed(6);
-    longitudeInput.value = lng.toFixed(6);
-
-    locationInput.value =
-      "Latitude: " + lat.toFixed(6) +
-      ", Longitude: " + lng.toFixed(6);
-
-    bloquearFormulario(false);
     confirmButton.disabled = true;
-    categorySelect.value = "";
-    formMessage.textContent = "";
+    atualizarStatus("Buscando o nome da rua e o endereço...");
 
-    atualizarStatus(
-      "Local confirmado! Escolha a categoria e descreva o problema."
-    );
-
-    const registrar = $("registrar");
-
-    if (registrar) {
-      registrar.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+    if (coordinates) {
+      coordinates.textContent = "Consultando endereço...";
     }
 
-    categorySelect.focus({ preventScroll: true });
+    try {
+      let endereco;
+
+      try {
+        endereco = await buscarEndereco(lat, lng);
+      } catch (erroEndereco) {
+        console.warn("Não foi possível obter o endereço:", erroEndereco);
+
+        // Permite continuar mesmo se o serviço de endereços falhar
+        endereco =
+          `Localização aproximada (Lat. ${lat.toFixed(6)}, ` +
+          `Long. ${lng.toFixed(6)})`;
+      }
+
+      // Salvar as coordenadas separadamente
+      latitudeInput.value = lat.toFixed(6);
+      longitudeInput.value = lng.toFixed(6);
+
+      // Salvar o endereço legível no Supabase
+      locationInput.value = endereco;
+      localConfirmado = true;
+
+      if (coordinates) {
+        coordinates.textContent = "Endereço: " + endereco;
+      }
+
+      if (marcador) {
+        marcador.bindPopup(endereco).openPopup();
+      }
+
+      bloquearFormulario(false);
+      confirmButton.disabled = true;
+      categorySelect.value = "";
+      formMessage.textContent = "";
+
+      if (endereco.startsWith("Localização aproximada")) {
+        atualizarStatus(
+          "Não foi possível encontrar o nome da rua. " +
+          "Confira o ponto no mapa. Você pode continuar com as coordenadas."
+        );
+      } else {
+        atualizarStatus(
+          "Endereço encontrado: " + endereco +
+          ". Escolha a categoria e descreva o problema."
+        );
+      }
+
+      const registrar = $("registrar");
+
+      if (registrar) {
+        registrar.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }
+
+      categorySelect.focus({ preventScroll: true });
+    } catch (erro) {
+      console.error("Erro ao confirmar local:", erro);
+
+      atualizarStatus(
+        "Ocorreu um erro ao confirmar o local. Tente novamente."
+      );
+
+      confirmButton.disabled = false;
+    }
   });
 
-  // 12. CADASTRAR OCORRÊNCIA E ENVIAR FOTO
+  // 13. CADASTRAR OCORRÊNCIA E ENVIAR FOTO
   form.addEventListener("submit", async function (evento) {
     evento.preventDefault();
 
@@ -555,7 +670,8 @@ document.addEventListener("DOMContentLoaded", function () {
             ? crypto.randomUUID()
             : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-        const nomeArquivo = `${Date.now()}-${identificador}.${extensao}`;
+        const nomeArquivo =
+          `${Date.now()}-${identificador}.${extensao}`;
 
         caminhoFoto = `ocorrencias/${nomeArquivo}`;
 
@@ -644,7 +760,6 @@ document.addEventListener("DOMContentLoaded", function () {
         carregarOcorrencias(),
         carregarMarcadoresOcorrencias()
       ]);
-
     } catch (erro) {
       console.error("Erro ao registrar ocorrência:", erro);
 
@@ -666,7 +781,6 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         }
       }
-
     } finally {
       submitButton.disabled = !localConfirmado;
     }
